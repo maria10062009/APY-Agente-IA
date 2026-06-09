@@ -2,73 +2,94 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Meu Chatbot na Nuvem</title>
+    <title>Chatbot Profissional</title>
+    <!-- 1. Importando Marked.js para entender Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .chat-container { background: white; width: 400px; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .historico { height: 300px; overflow-y: auto; background: #eef2f3; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
-        .mensagem { margin-bottom: 10px; padding: 8px; border-radius: 5px; }
-        .user { background: #007bff; color: white; text-align: right; }
-        .bot { background: #ddd; color: black; text-align: left; }
-        input { width: 75%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { width: 20%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .chat-container { background: white; width: 450px; padding: 20px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+        .historico { height: 350px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; }
+        .mensagem { margin-bottom: 15px; padding: 10px; border-radius: 10px; line-height: 1.4; }
+        .user { background: #007bff; color: white; margin-left: 20%; text-align: right; }
+        .bot { background: #e9ecef; color: #333; margin-right: 20%; text-align: left; }
+        .controles { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-enviar { background: #28a745; color: white; }
+        .btn-limpar { background: #dc3545; color: white; width: 100%; margin-top: 10px; }
+        /* Estilização para códigos dentro do chat */
+        pre { background: #272822; color: white; padding: 10px; border-radius: 5px; overflow-x: auto; }
     </style>
 </head>
 <body>
     <div class="chat-container">
         <h2>🤖 Assistente IA</h2>
         <div class="historico" id="historico"></div>
-        <div>
+        <div class="controles">
             <input type="text" id="pergunta" placeholder="Digite sua pergunta...">
-            <button onclick="enviarMensagem()">Enviar</button>
+            <button class="btn-enviar" onclick="enviarMensagem()">Enviar</button>
         </div>
+        <button class="btn-limpar" onclick="limparConversa()">🗑️ Limpar Conversa</button>
     </div>
 
     <script>
-        // COLE A URL DO SEU RENDER AQUI (mantenha o /api/chat no final)
+        const URL_BASE = window.location.origin + "/api/chat";
 
-    const URL_BACKEND = "http://localhost:3000/api/chat";
         async function enviarMensagem() {
-    const input = document.getElementById("pergunta");
-    const historico = document.getElementById("historico");
-    const texto = input.value;
+            const input = document.getElementById("pergunta");
+            const historico = document.getElementById("historico");
+            const texto = input.value;
+            if(!texto) return;
 
-    if(!texto) return;
+            // Mostra pergunta do usuário
+            historico.innerHTML += `<div class="mensagem user">${texto}</div>`;
+            input.value = "";
+            
+            const botMsgDiv = document.createElement("div");
+            botMsgDiv.className = "mensagem bot";
+            botMsgDiv.innerHTML = "<i>Pensando...</i>";
+            historico.appendChild(botMsgDiv);
 
-    // Adiciona pergunta do usuário na tela
-    historico.innerHTML += `<div class="mensagem user">${texto}</div>`;
-    input.value = "";
-    
-    // Cria o balão de "Pensando..."
-    const botMsgDiv = document.createElement("div");
-    botMsgDiv.className = "mensagem bot";
-    botMsgDiv.innerHTML = "Pensando...";
-    historico.appendChild(botMsgDiv);
+            try {
+                const response = await fetch(URL_BASE, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pergunta: texto })
+                });
+                const dados = await response.json();
 
-    try {
-        // MUDE PARA LOCALHOST:3000 PARA TESTAR NO PC
-        const URL_BACKEND = "http://localhost:3000/api/chat";
-
-        const resposta = await fetch(URL_BACKEND, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pergunta: texto })
-        });
-
-        const dados = await resposta.json();
-
-        if (dados.sucesso) {
-            botMsgDiv.innerHTML = dados.resposta; // Aqui ele pega a resposta da IA
-        } else {
-            botMsgDiv.innerHTML = "Erro: " + dados.erro;
+                if (dados.sucesso) {
+                    // 2. USO DO MARKED: Transforma o Markdown da IA em HTML bonito
+                    botMsgDiv.innerHTML = marked.parse(dados.resposta);
+                } else {
+                    botMsgDiv.innerHTML = "Erro: " + dados.erro;
+                }
+            } catch (erro) {
+                botMsgDiv.innerHTML = "Erro de conexão ❌";
+            }
+            historico.scrollTop = historico.scrollHeight;
         }
-        
-    } catch (erro) {
-        botMsgDiv.innerHTML = "Erro de conexão com o Servidor ❌";
-    }
-    historico.scrollTop = historico.scrollHeight;
-}
+
+        // 3. FUNCIONALIDADE DE LIMPAR
+        async function limparConversa() {
+            if(!confirm("Deseja apagar todo o histórico?")) return;
+
+            try {
+                const response = await fetch(`${URL_BASE}/limpar`, { method: "DELETE" });
+                const dados = await response.json();
+                if(dados.sucesso) {
+                    document.getElementById("historico").innerHTML = "";
+                    alert("Conversa resetada!");
+                }
+            } catch (erro) {
+                alert("Erro ao limpar conversa.");
+            }
+        }
+
+        // Permitir enviar com a tecla Enter
+        document.getElementById("pergunta").addEventListener("keypress", (e) => {
+            if(e.key === 'Enter') enviarMensagem();
+        });
     </script>
 </body>
 </html>
-
