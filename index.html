@@ -2,94 +2,69 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Chatbot Profissional</title>
-    <!-- 1. Importando Marked.js para entender Markdown -->
+    <title>Mestre do Jogo IA</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .chat-container { background: white; width: 450px; padding: 20px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-        .historico { height: 350px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; }
-        .mensagem { margin-bottom: 15px; padding: 10px; border-radius: 10px; line-height: 1.4; }
-        .user { background: #007bff; color: white; margin-left: 20%; text-align: right; }
-        .bot { background: #e9ecef; color: #333; margin-right: 20%; text-align: left; }
-        .controles { display: flex; gap: 10px; }
-        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
-        button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .btn-enviar { background: #28a745; color: white; }
-        .btn-limpar { background: #dc3545; color: white; width: 100%; margin-top: 10px; }
-        /* Estilização para códigos dentro do chat */
-        pre { background: #272822; color: white; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        body { font-family: sans-serif; background: #0f0c29; color: white; display: flex; justify-content: center; padding: 20px; }
+        .chat-card { background: #24243e; width: 100%; max-width: 500px; padding: 20px; border-radius: 15px; }
+        #historico { height: 300px; overflow-y: auto; background: #16213e; padding: 15px; border-radius: 10px; margin: 15px 0; }
+        .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; }
+        .user { background: #e94560; text-align: right; }
+        .bot { background: #0f3460; border-left: 4px solid #e94560; }
+        input { padding: 10px; border-radius: 5px; border: none; }
+        button { padding: 10px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
+        #ranking-box { display: none; background: #1b1b2f; padding: 10px; border: 1px solid gold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <h2>🤖 Assistente IA</h2>
-        <div class="historico" id="historico"></div>
-        <div class="controles">
-            <input type="text" id="pergunta" placeholder="Digite sua pergunta...">
-            <button class="btn-enviar" onclick="enviarMensagem()">Enviar</button>
+    <div class="chat-card">
+        <h2>🎮 Mestre do Jogo</h2>
+        <input type="text" id="nickname" placeholder="Nickname..." style="width: 90%; margin-bottom: 10px;">
+        <button onclick="toggleRanking()" style="background: gold; width: 100%;">🏆 Ranking</button>
+        <div id="ranking-box"></div>
+        <div id="historico"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="pergunta" placeholder="Sua resposta..." style="flex-grow: 1;">
+            <button onclick="enviar()" style="background: #27ae60;">Enviar</button>
         </div>
-        <button class="btn-limpar" onclick="limparConversa()">🗑️ Limpar Conversa</button>
+        <button onclick="limpar()" style="margin-top: 10px; background: #555; width: 100%;">Limpar Chat</button>
     </div>
 
     <script>
-        const URL_BASE = window.location.origin + "/api/chat";
+        const API_URL = window.location.origin + "/api/chat";
 
-        async function enviarMensagem() {
+        async function enviar() {
+            const nick = document.getElementById("nickname").value;
             const input = document.getElementById("pergunta");
-            const historico = document.getElementById("historico");
-            const texto = input.value;
-            if(!texto) return;
+            const hist = document.getElementById("historico");
+            if(!nick || !input.value) return alert("Preencha tudo!");
 
-            // Mostra pergunta do usuário
-            historico.innerHTML += `<div class="mensagem user">${texto}</div>`;
+            hist.innerHTML += `<div class="msg user"><b>${nick}:</b> ${input.value}</div>`;
+            const msg = input.value;
             input.value = "";
-            
-            const botMsgDiv = document.createElement("div");
-            botMsgDiv.className = "mensagem bot";
-            botMsgDiv.innerHTML = "<i>Pensando...</i>";
-            historico.appendChild(botMsgDiv);
 
-            try {
-                const response = await fetch(URL_BASE, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ pergunta: texto })
-                });
-                const dados = await response.json();
-
-                if (dados.sucesso) {
-                    // 2. USO DO MARKED: Transforma o Markdown da IA em HTML bonito
-                    botMsgDiv.innerHTML = marked.parse(dados.resposta);
-                } else {
-                    botMsgDiv.innerHTML = "Erro: " + dados.erro;
-                }
-            } catch (erro) {
-                botMsgDiv.innerHTML = "Erro de conexão ❌";
-            }
-            historico.scrollTop = historico.scrollHeight;
+            const res = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nickname: nick, pergunta: msg })
+            });
+            const data = await res.json();
+            hist.innerHTML += `<div class="msg bot">${marked.parse(data.resposta)}</div>`;
+            hist.scrollTop = hist.scrollHeight;
         }
 
-        // 3. FUNCIONALIDADE DE LIMPAR
-        async function limparConversa() {
-            if(!confirm("Deseja apagar todo o histórico?")) return;
-
-            try {
-                const response = await fetch(`${URL_BASE}/limpar`, { method: "DELETE" });
-                const dados = await response.json();
-                if(dados.sucesso) {
-                    document.getElementById("historico").innerHTML = "";
-                    alert("Conversa resetada!");
-                }
-            } catch (erro) {
-                alert("Erro ao limpar conversa.");
-            }
+        async function toggleRanking() {
+            const box = document.getElementById("ranking-box");
+            box.style.display = box.style.display === "block" ? "none" : "block";
+            const res = await fetch(API_URL + "/ranking");
+            const data = await res.json();
+            box.innerHTML = data.map((j, i) => `<p>${i+1}º ${j.nome} - ${j.xp} XP</p>`).join("");
         }
 
-        // Permitir enviar com a tecla Enter
-        document.getElementById("pergunta").addEventListener("keypress", (e) => {
-            if(e.key === 'Enter') enviarMensagem();
-        });
+        async function limpar() {
+            await fetch(API_URL + "/limpar", { method: "DELETE" });
+            location.reload();
+        }
     </script>
 </body>
 </html>
