@@ -1,51 +1,51 @@
-
-exports.enviarMensagem = async (req, res) => {
-    console.log("----------------------------");
-    console.log("RECEBI UMA PERGUNTA:", req.body.pergunta); // ADICIONE ESTA LINHA
-    console.log("----------------------------");
-}
-const Mensagem = require('../models/Mensagem');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 exports.enviarMensagem = async (req, res) => {
     try {
-        const { pergunta } = req.body;
-        if (!pergunta) return res.status(400).json({ sucesso: false, erro: "Envie uma pergunta." });
+        const { pergunta, nickname } = req.body;
+        console.log(`--- Nova pergunta de ${nickname}: ${pergunta} ---`);
 
-        // 1. Salva pergunta do usuário
-        await Mensagem.create({ role: "user", parts: [{ text: pergunta }] });
+        // 1. Salva no banco
+        await Mensagem.create({ role: "user", parts: [{ text: `[${nickname}]: ${pergunta}` }] });
 
-        // 2. Busca histórico para o Gemini ter contexto
-        const historico = await Mensagem.find()
-                                        .select('role parts -_id')
-                                        .sort({ dataHora: 1 })
-                                        .limit(20);
+        // 2. Busca e limpa o histórico para a IA não se confundir
+        const historicoDB = await Mensagem.find().sort({ dataHora: 1 }).limit(10);
+        const history = historicoDB.map(m => ({
+            role: m.role === "model" ? "model" : "user", // Garante que o role seja aceito pelo Gemini
+            parts: [{ text: m.parts[0].text }]
+        }));
 
-        // 3. Configura e chama o Gemini
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const chat = model.startChat({ history: historico });
-        const result = await chat.sendMessage(pergunta);
-        const respostaDaIA = result.response.text();
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash",
+            tools: [{ functionDeclarations: declaracoes }],
+            systemInstruction: `Você é um Mestre de Jogo de RPG. Proponha desafios ao jogador ${nickname}. Se ele acertar, use 'adicionarXP' com 50. Se errar, use -10.`
+        });
 
-        // 4. Salva resposta da IA
-        await Mensagem.create({ role: "model", parts: [{ text: respostaDaIA }] });
+        const chat = model.startChat({ history });
 
-        return res.status(200).json({ sucesso: true, resposta: respostaDaIA });
-    } catch (erro) {
-        console.error("❌ Erro no Controller:", erro);
-        return res.status(500).json({ sucesso: false, erro: "Erro ao processar chat." });
+        console.log("Aguardando resposta do Gemini...");
+        let result = await chat.sendMessage(pergunta);
+        let response = result.response;
+        let parts = response.candidates[0].content.parts;
+
+        // 3. Verifica se a IA quer chamar uma função (XP ou Clima)
+        if (parts[0].functionCall) {
+            const call = parts[0].functionCall;
+            console.log(`IA chamando função: ${call.name}`);
+            const acao = await ferramentasMap[call.name](call.args);
+            
+            // Envia o resultado da função de volta para a IA
+            result = await chat.sendMessage([{
+                functionResponse: { name: call.name, response: { content: acao } }
+            }]);
+        }
+
+        const textoFinal = result.response.text();
+        console.log("IA respondeu com sucesso!");
+
+        await Mensagem.create({ role: "model", parts: [{ text: textoFinal }] });
+        res.json({ sucesso: true, resposta: textoFinal });
+
+    } catch (err) {
+        console.error("❌ ERRO NO CONTROLLER:", err); // Isso vai mostrar o erro real no terminal
+        res.status(500).json({ sucesso: false, erro: err.message });
     }
 };
-
-// NOVA FUNCIONALIDADE: Limpar Histórico
-exports.limparHistorico = async (req, res) => {
-    try {
-        await Mensagem.deleteMany({});
-        return res.status(200).json({ sucesso: true, mensagem: "Histórico apagado com sucesso!" });
-    } catch (erro) {
-        return res.status(500).json({ sucesso: false, erro: "Erro ao limpar banco." });
-    }
-};
-
