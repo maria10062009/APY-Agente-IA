@@ -1,70 +1,65 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Mestre do Jogo IA</title>
+    <title>IA Analista Corporativa</title>
+    <link rel="stylesheet" href="CSS/estilo.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <style>
-        body { font-family: sans-serif; background: #0f0c29; color: white; display: flex; justify-content: center; padding: 20px; }
-        .chat-card { background: #24243e; width: 100%; max-width: 500px; padding: 20px; border-radius: 15px; }
-        #historico { height: 300px; overflow-y: auto; background: #16213e; padding: 15px; border-radius: 10px; margin: 15px 0; }
-        .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; }
-        .user { background: #e94560; text-align: right; }
-        .bot { background: #0f3460; border-left: 4px solid #e94560; }
-        input { padding: 10px; border-radius: 5px; border: none; }
-        button { padding: 10px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
-        #ranking-box { display: none; background: #1b1b2f; padding: 10px; border: 1px solid gold; margin-bottom: 10px; }
-    </style>
 </head>
 <body>
-    <div class="chat-card">
-        <h2>🎮 Mestre do Jogo</h2>
-        <input type="text" id="nickname" placeholder="Nickname..." style="width: 90%; margin-bottom: 10px;">
-        <button onclick="toggleRanking()" style="background: gold; width: 100%;">🏆 Ranking</button>
-        <div id="ranking-box"></div>
-        <div id="historico"></div>
-        <div style="display: flex; gap: 5px;">
-            <input type="text" id="pergunta" placeholder="Sua resposta..." style="flex-grow: 1;">
-            <button onclick="enviar()" style="background: #27ae60;">Enviar</button>
-        </div>
-        <button onclick="limpar()" style="margin-top: 10px; background: #555; width: 100%;">Limpar Chat</button>
-    </div>
 
-    <script>
-        const API_URL = window.location.origin + "/api/chat";
+<div class="container">
+    <h2>🤖 Analista Corporativo</h2>
+    <input type="file" id="docUpload" accept=".pdf">
+    <input type="text" id="pergunta" placeholder="Faça uma pergunta sobre o documento">
+    <button onclick="enviar()">Analisar Documento</button>
+    <div id="resultado">Aguardando análise...</div>
+</div>
 
-        async function enviar() {
-            const nick = document.getElementById("nickname").value;
-            const input = document.getElementById("pergunta");
-            const hist = document.getElementById("historico");
-            if(!nick || !input.value) return alert("Preencha tudo!");
+<script>
+    async function enviar() {
+        console.log("Botão clicado!");
+        const resultadoDiv = document.getElementById('resultado');
+        const fileInput = document.getElementById('docUpload');
+        const pergunta = document.getElementById('pergunta').value;
 
-            hist.innerHTML += `<div class="msg user"><b>${nick}:</b> ${input.value}</div>`;
-            const msg = input.value;
-            input.value = "";
+        if (!fileInput.files[0] || !pergunta) {
+            alert("Por favor, selecione um arquivo e digite uma pergunta.");
+            return;
+        }
 
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nickname: nick, pergunta: msg })
+        resultadoDiv.innerText = "Processando... aguarde.";
+
+        const formData = new FormData();
+        formData.append('documento', fileInput.files[0]);
+        formData.append('pergunta', pergunta);
+
+        try {
+            // Seu token integrado aqui
+            const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWx1bm8iLCJpYXQiOjE3OTE5NzcwNTZ9.IxCBqjBQhvBGbFn8EaCSAd5R1AvH5Dr77mmwbLED2L4";
+
+            const res = await fetch('/api/chat/documento', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': 'Bearer ' + token
+                },
+                body: formData
             });
+            
             const data = await res.json();
-            hist.innerHTML += `<div class="msg bot">${marked.parse(data.resposta)}</div>`;
-            hist.scrollTop = hist.scrollHeight;
+            console.log("Resposta do servidor:", data);
+            
+            if (res.ok) {
+                resultadoDiv.innerHTML = marked.parse(data.resposta);
+            } else {
+                resultadoDiv.innerHTML = `<span style="color:red">Erro ${res.status}: ${data.error || 'Erro'}</span>`;
+            }
+        } catch (err) {
+            console.error("Erro de conexão:", err);
+            resultadoDiv.innerHTML = `<span style="color:red">Erro de conexão. Verifique o console!</span>`;
         }
+    }
+</script>
 
-        async function toggleRanking() {
-            const box = document.getElementById("ranking-box");
-            box.style.display = box.style.display === "block" ? "none" : "block";
-            const res = await fetch(API_URL + "/ranking");
-            const data = await res.json();
-            box.innerHTML = data.map((j, i) => `<p>${i+1}º ${j.nome} - ${j.xp} XP</p>`).join("");
-        }
-
-        async function limpar() {
-            await fetch(API_URL + "/limpar", { method: "DELETE" });
-            location.reload();
-        }
-    </script>
 </body>
 </html>

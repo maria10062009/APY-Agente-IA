@@ -1,25 +1,21 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
 const path = require('path');
-const chatRoutes = require('./routes/chatRoutes'); // Caminho correto para a pasta routes
-
 const app = express();
+const documentRoutes = require('./documentRoutes');
 
-app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); 
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('📦 MongoDB Conectado!'))
-    .catch(err => console.error('❌ Erro Banco:', err));
+// Força o uso da pasta 'Public' e define index.html como o padrão
+app.use(express.static(path.join(__dirname, 'Public'), { 
+    index: 'index.html',
+    extensions: ['html'] 
+}));
 
-app.use('/api/chat', chatRoutes);
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.use('/api', documentRoutes);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor: http://localhost:${PORT}`));
+
+app.listen(PORT, () => {
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
+});
